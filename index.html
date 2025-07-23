@@ -4,9 +4,15 @@
     <title>FPS Game</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="crosshair.css">
+    <link rel="stylesheet" href="hud.css">
 </head>
 <body>
     <div class="crosshair"></div>
+    <div class="hud">
+        <span class="hud-item" id="health">Health: 100</span>
+        <span class="hud-item" id="weapon">Weapon: Pistol</span>
+        <span class="hud-item" id="ammo">Ammo: 12/12</span>
+    </div>
     <div id="main-menu">
         <h1>FPS Game</h1>
         <button id="start-button">Start Game</button>
@@ -21,6 +27,12 @@
     <canvas id="game-canvas" style="display: none;"></canvas>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="Weapon.js"></script>
+    <script src="Inventory.js"></script>
+    <script src="Buildable.js"></script>
+    <script src="BuildingSystem.js"></script>
+    <script src="GameMode.js"></script>
+    <script src="FreeForAll.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

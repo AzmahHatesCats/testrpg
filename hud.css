@@ -1,0 +1,13 @@
+.hud {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px;
+    color: white;
+    font-family: sans-serif;
+}
+
+.hud-item {
+    margin: 0 10px;
+}

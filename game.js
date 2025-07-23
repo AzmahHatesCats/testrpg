@@ -2,55 +2,57 @@
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas') });
+renderer.shadowMap.enabled = true;
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // Add a floor
-const floorGeometry = new THREE.PlaneGeometry(100, 100, 10, 10);
+const floorGeometry = new THREE.PlaneGeometry(1000, 1000, 50, 50);
 const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x808080, side: THREE.DoubleSide });
 const floor = new THREE.Mesh(floorGeometry, floorMaterial);
 floor.rotation.x = Math.PI / 2;
+floor.receiveShadow = true;
 scene.add(floor);
 
-// Add some walls
-const wallGeometry = new THREE.BoxGeometry(100, 10, 1);
-const wallMaterial = new THREE.MeshBasicMaterial({ color: 0xA52A2A });
-const wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
-wall1.position.z = 50;
-wall1.position.y = 5;
-scene.add(wall1);
+for (let i = 0; i < floor.geometry.attributes.position.count; i++) {
+    const z = floor.geometry.attributes.position.getZ(i);
+    floor.geometry.attributes.position.setZ(i, z + Math.random() * 20 - 10);
+}
+floor.geometry.attributes.position.needsUpdate = true;
+floor.geometry.computeVertexNormals();
 
-const wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
-wall2.position.z = -50;
-wall2.position.y = 5;
-scene.add(wall2);
+const ambientLight = new THREE.AmbientLight(0x404040);
+scene.add(ambientLight);
 
-const wall3 = new THREE.Mesh(wallGeometry, wallMaterial);
-wall3.rotation.y = Math.PI / 2;
-wall3.position.x = 50;
-wall3.position.y = 5;
-scene.add(wall3);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+directionalLight.position.set(0, 100, 0);
+directionalLight.castShadow = true;
+scene.add(directionalLight);
 
-const wall4 = new THREE.Mesh(wallGeometry, wallMaterial);
-wall4.rotation.y = Math.PI / 2;
-wall4.position.x = -50;
-wall4.position.y = 5;
-scene.add(wall4);
 
 
 // Player
+const buildingSystem = new BuildingSystem(scene);
+
 const player = {
     speed: 0.1,
     velocity: new THREE.Vector3(),
-    direction: new THREE.Vector3()
+    direction: new THREE.Vector3(),
+    canJump: true,
+    inventory: new Inventory()
 };
+
+player.inventory.addWeapon(new Weapon('Pistol', 10, 50));
 
 // Controls
 const controls = {
     moveForward: false,
     moveBackward: false,
     moveLeft: false,
-    moveRight: false
+    moveRight: false,
+    jump: false,
+    sprint: false,
+    crouch: false
 };
 
 document.addEventListener('keydown', (event) => {
@@ -66,6 +68,18 @@ document.addEventListener('keydown', (event) => {
             break;
         case 'KeyD':
             controls.moveRight = true;
+            break;
+        case 'Space':
+            if (player.canJump === true) controls.jump = true;
+            break;
+        case 'ShiftLeft':
+            controls.sprint = true;
+            break;
+        case 'ControlLeft':
+            controls.crouch = true;
+            break;
+        case 'KeyQ':
+            buildingSystem.switchBuildable();
             break;
     }
 });
@@ -84,6 +98,12 @@ document.addEventListener('keyup', (event) => {
         case 'KeyD':
             controls.moveRight = false;
             break;
+        case 'ShiftLeft':
+            controls.sprint = false;
+            break;
+        case 'ControlLeft':
+            controls.crouch = false;
+            break;
     }
 });
 
@@ -94,8 +114,19 @@ document.addEventListener('mousemove', (event) => {
     }
 });
 
-document.body.addEventListener('click', () => {
-    document.body.requestPointerLock();
+document.body.addEventListener('click', (event) => {
+    if (event.button === 0) { // Left-click
+        document.body.requestPointerLock();
+    } else if (event.button === 2) { // Right-click
+        buildingSystem.placeBuildable();
+    }
+});
+
+document.addEventListener('wheel', (event) => {
+    if (document.pointerLockElement === document.body) {
+        const direction = event.deltaY > 0 ? 1 : -1;
+        player.inventory.switchWeapon(direction);
+    }
 });
 
 camera.position.y = 1.8;
@@ -107,6 +138,9 @@ const startButton = document.getElementById('start-button');
 const optionsButton = document.getElementById('options-button');
 const backButton = document.getElementById('back-button');
 const fovSlider = document.getElementById('fov-slider');
+const healthElement = document.getElementById('health');
+const weaponElement = document.getElementById('weapon');
+const ammoElement = document.getElementById('ammo');
 
 startButton.addEventListener('click', () => {
     mainMenu.style.display = 'none';
@@ -170,9 +204,10 @@ socket.on('player disconnected', (id) => {
 
 function addPlayer(id, data) {
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const newPlayer = new THREE.Mesh(geometry, material);
     newPlayer.position.set(data.position.x, data.position.y, data.position.z);
+    newPlayer.castShadow = true;
     players[id] = newPlayer;
     scene.add(newPlayer);
 }
@@ -220,15 +255,41 @@ function animate() {
     player.direction.x = Number(controls.moveLeft) - Number(controls.moveRight);
     player.direction.normalize();
 
+    const speed = controls.sprint ? player.speed * 2 : player.speed;
+
     if (controls.moveForward || controls.moveBackward) {
-        player.velocity.z -= player.direction.z * player.speed;
+        player.velocity.z -= player.direction.z * speed;
     }
     if (controls.moveLeft || controls.moveRight) {
-        player.velocity.x -= player.direction.x * player.speed;
+        player.velocity.x -= player.direction.x * speed;
     }
+
+    if (controls.jump) {
+        player.velocity.y = 0.3;
+        player.canJump = false;
+        controls.jump = false;
+    }
+
+    player.velocity.y -= 0.01;
 
     camera.position.z += player.velocity.z;
     camera.position.x += player.velocity.x;
+    camera.position.y += player.velocity.y;
+
+    const crouchHeight = 1.2;
+    const standingHeight = 1.8;
+    const targetHeight = controls.crouch ? crouchHeight : standingHeight;
+
+    camera.position.y += (targetHeight - camera.position.y) * 0.1;
+
+
+    if (camera.position.y < standingHeight) {
+        if (!controls.crouch) {
+             camera.position.y = standingHeight;
+        }
+        player.canJump = true;
+    }
+
 
     player.velocity.z *= 0.9;
     player.velocity.x *= 0.9;
@@ -237,6 +298,24 @@ function animate() {
         position: camera.position,
         rotation: camera.rotation
     });
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+    const intersects = raycaster.intersectObjects(scene.children);
+    if (intersects.length > 0) {
+        const intersect = intersects[0];
+        const position = intersect.point.add(intersect.face.normal);
+        position.divideScalar(5).floor().multiplyScalar(5).addScalar(2.5);
+        buildingSystem.updatePreview(position, new THREE.Euler(0, camera.rotation.y, 0));
+    }
+
+    const currentWeapon = player.inventory.getCurrentWeapon();
+    if (currentWeapon) {
+        weaponElement.innerText = `Weapon: ${currentWeapon.name}`;
+    } else {
+        weaponElement.innerText = 'Weapon: None';
+    }
+
 
     renderer.render(scene, camera);
 }
