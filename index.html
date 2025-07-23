@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FPS Game</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="crosshair.css">
+</head>
+<body>
+    <div class="crosshair"></div>
+    <div id="main-menu">
+        <h1>FPS Game</h1>
+        <button id="start-button">Start Game</button>
+        <button id="options-button">Options</button>
+    </div>
+    <div id="options-menu" style="display: none;">
+        <h1>Options</h1>
+        <label for="fov-slider">FOV:</label>
+        <input type="range" id="fov-slider" min="50" max="110" value="75">
+        <button id="back-button">Back</button>
+    </div>
+    <canvas id="game-canvas" style="display: none;"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
